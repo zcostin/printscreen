@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import sys
 import os
 import hashlib
@@ -40,20 +41,33 @@ def get_hash(filename, first_chunk_only=False, hash=hashlib.sha1):
         return hashed
         
         
-def move_file(destination, file, suffix='mp3'):
-    print("Move file from %s to %s" % (file, destination))
-    var = input("Please enter YES|yes|Yes|Y|y: ")
-    if var in ['YES', 'yes', 'Yes', 'Y', 'y']:
-        #if os.path.exists(file) and file.endswith(suffix):
-        if os.path.exists(file):
+def move_file(duplicate1, duplicate2, destination, suffix='mp3'):
+    while True: 
+        var = input("Move first duplicate|second [1|2] or skip [s]:")
+
+        if var == '1':
+            file = duplicate1
+            break
+        elif var == '2':
+            file = duplicate2
+            break
+        elif var == 's':
+            return
+        else:
+            continue
+
+    #if os.path.exists(file) and file.endswith(suffix):
+    if os.path.exists(file):
+        try:
             os.rename(file, destination + "/" + os.path.basename(file))
+        except:
+            print("Cannot move file %s", file)
 
 
-def check_for_duplicates(paths, file_desc, hash=hashlib.sha1):
+def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
     hashes_by_size = {}
     hashes_on_1k = {}
     hashes_full = {}
-    destination = "D:\duplicates"
 
     for path in paths:
         for dirpath, dirnames, filenames in os.walk(path):
@@ -99,14 +113,14 @@ def check_for_duplicates(paths, file_desc, hash=hashlib.sha1):
 
             duplicate = hashes_full.get(full_hash)
             if duplicate:
-                uprint ("Duplicate found: %s and %s" % (filename, duplicate))
-                move_file(destination, duplicate)
+                uprint ("Duplicate found: \n%s\n%s" % (filename, duplicate))
+                move_file(filename, duplicate, destination)
             else:
                 hashes_full[full_hash] = filename
 
 if sys.argv[1:]:
     f1=open(sys.argv[2], 'w+')
-    check_for_duplicates([sys.argv[1]], f1)
+    check_for_duplicates([sys.argv[1]], f1, sys.argv[3])
     f1.close()
 else:
     uprint ("Please pass the paths to check as parameters to the script")
