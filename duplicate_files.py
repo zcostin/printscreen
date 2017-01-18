@@ -1,8 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.5
 
 import sys
 import os
+import argparse
 import hashlib
+
+version = '0.1'
 
 #python duplicate_files.py D:/fotografii C:/Users/Costin/Downloads/fotografii_duplicates.txt
 
@@ -28,7 +31,7 @@ def get_hash(filename, first_chunk_only=False, hash=hashlib.sha1):
     try:
         file_object = open(filename, 'rb')
     except:
-        uprint("Cannot open %s" % (filename))
+        uprint("Cannot open {}".format(filename))
     else:
         if first_chunk_only:
             hashobj.update(file_object.read(1024))
@@ -43,7 +46,7 @@ def get_hash(filename, first_chunk_only=False, hash=hashlib.sha1):
         
 def move_file(duplicate1, duplicate2, destination, suffix='mp3'):
     while True: 
-        var = input("Move first duplicate|second [1|2] or skip [s]:")
+        var = input("Move first|second [1|2] duplicate or skip [s]:")
 
         if var == '1':
             file = duplicate1
@@ -61,7 +64,7 @@ def move_file(duplicate1, duplicate2, destination, suffix='mp3'):
         try:
             os.rename(file, destination + "/" + os.path.basename(file))
         except:
-            print("Cannot move file %s", file)
+            print("Cannot move file {}".format(file))
 
 
 def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
@@ -73,7 +76,7 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
         for dirpath, dirnames, filenames in os.walk(path):
             for filename in filenames:
                 full_path = os.path.join(dirpath, filename)
-                # uprint("%s" % (full_path))
+                # uprint("{}".format(full_path))
                 try:
                     file_size = os.path.getsize(full_path)
                 except (OSError,):
@@ -100,7 +103,7 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
             if duplicate:
                 hashes_on_1k[small_hash].append(filename)
             else:
-                hashes_on_1k[small_hash] = []          # create the list for this 1k hash
+                hashes_on_1k[small_hash] = [] # create the list for this 1k hash
                 hashes_on_1k[small_hash].append(filename)
 
     # For all files with the hash on the 1st 1024 bytes, get their hash on the full file - collisions will be duplicates
@@ -113,14 +116,34 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
 
             duplicate = hashes_full.get(full_hash)
             if duplicate:
-                uprint ("Duplicate found: \n%s\n%s" % (filename, duplicate))
+                uprint ("Duplicate found:\n1] {}\n2] {}".format(filename, duplicate))
+                uprint ("Duplicate found:\n1] {}\n2] {}".format(filename, duplicate), file=file_desc)
                 move_file(filename, duplicate, destination)
             else:
                 hashes_full[full_hash] = filename
 
-if sys.argv[1:]:
-    f1=open(sys.argv[2], 'w+')
-    check_for_duplicates([sys.argv[1]], f1, sys.argv[3])
-    f1.close()
+
+if __name__== "__main__":
+    parser = argparse.ArgumentParser(
+                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                 description='Find duplicate files and move them to specified directory.',
+                 epilog="Version: {}".format(version))
+
+    parser.add_argument('-d','--directory', type=str, nargs=1,
+                        help='directory to scan for duplicate files')
+
+    parser.add_argument('-l', '--log_file', type=str, help='log file')
+
+    parser.add_argument('-m', '--move_to_directory', type=str, nargs=1,
+                        help='directory where duplicates are moved')
+
+    if len(sys.argv) < 2:
+        parser.print_help()
+        sys.exit(1)
+
+    args = parser.parse_args()
+
+    with open(args.log_file, 'w+') as f1:
+        check_for_duplicates(args.directory, f1, args.move_to_directory)
 else:
-    uprint ("Please pass the paths to check as parameters to the script")
+    sys.exit(2)
