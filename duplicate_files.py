@@ -4,8 +4,9 @@ import sys
 import os
 import argparse
 import hashlib
+import logging
 
-version = '0.1'
+version = '0.2'
 
 #python duplicate_files.py D:/fotografii C:/Users/Costin/Downloads/fotografii_duplicates.txt
 
@@ -62,12 +63,17 @@ def move_file(duplicate1, duplicate2, destination, suffix='mp3'):
     #if os.path.exists(file) and file.endswith(suffix):
     if os.path.exists(file):
         try:
-            os.rename(file, destination + "/" + os.path.basename(file))
-        except:
-            print("Cannot move file {}".format(file))
+            d_path = destination + "/" + os.path.basename(file)
+            os.rename(file, d_path)
+        except OSError as e:
+            err_msg = "Cannot move file {} to {} ({})".format(file, d_path, e.strerror)
+            print(err_msg)
+            logging.info(err_msg)
+        else:
+            logging.info("Moved file {} to {}.".format(file, d_path))
 
 
-def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
+def check_for_duplicates(paths, destination, hash=hashlib.sha1):
     hashes_by_size = {}
     hashes_on_1k = {}
     hashes_full = {}
@@ -79,7 +85,7 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
                 # uprint("{}".format(full_path))
                 try:
                     file_size = os.path.getsize(full_path)
-                except (OSError,):
+                except OSError as e:
                     # not accessible (permissions, etc) - pass on
                     pass
                 else:
@@ -94,7 +100,7 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
     # For all files with the same file size, get their hash on the 1st 1024 bytes
     for __, files in hashes_by_size.items():
         if len(files) < 2:
-            continue    # this file size is unique, no need to spend cpy cycles on it
+            continue # this file size is unique, no need to spend cpu cycles on it
 
         for filename in files:
             small_hash = get_hash(filename, first_chunk_only=True)
@@ -106,10 +112,11 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
                 hashes_on_1k[small_hash] = [] # create the list for this 1k hash
                 hashes_on_1k[small_hash].append(filename)
 
-    # For all files with the hash on the 1st 1024 bytes, get their hash on the full file - collisions will be duplicates
+    # For all files with the hash on the 1st 1024 bytes,
+    # get their hash on the full file - collisions will be duplicates
     for __, files in hashes_on_1k.items():
         if len(files) < 2:
-            continue    # this hash of fist 1k file bytes is unique, no need to spend cpu cycles on it
+            continue # this hash of fist 1k file bytes is unique, no need to spend cpu cycles on it
 
         for filename in files:
             full_hash = get_hash(filename, first_chunk_only=False)
@@ -117,7 +124,6 @@ def check_for_duplicates(paths, file_desc, destination, hash=hashlib.sha1):
             duplicate = hashes_full.get(full_hash)
             if duplicate:
                 uprint ("Duplicate found:\n1] {}\n2] {}".format(filename, duplicate))
-                uprint ("Duplicate found:\n1] {}\n2] {}".format(filename, duplicate), file=file_desc)
                 move_file(filename, duplicate, destination)
             else:
                 hashes_full[full_hash] = filename
@@ -129,12 +135,14 @@ if __name__== "__main__":
                  description='Find duplicate files and move them to specified directory.',
                  epilog="Version: {}".format(version))
 
-    parser.add_argument('-d','--directory', type=str, nargs=1,
-                        help='directory to scan for duplicate files')
+    parser.add_argument('-d','--directory', type=str, nargs='+',
+                        help='directory to scan for duplicate files. \
+                              Multiple directories can be specified.')
 
-    parser.add_argument('-l', '--log_file', type=str, help='log file')
+    parser.add_argument('-l', '--log_file', type=str, nargs='?',
+                        default='duplicate_files.log', help='log file')
 
-    parser.add_argument('-m', '--move_to_directory', type=str, nargs=1,
+    parser.add_argument('-m', '--move_to_directory', type=str, nargs='?',
                         help='directory where duplicates are moved')
 
     if len(sys.argv) < 2:
@@ -143,7 +151,12 @@ if __name__== "__main__":
 
     args = parser.parse_args()
 
-    with open(args.log_file, 'w+') as f1:
-        check_for_duplicates(args.directory, f1, args.move_to_directory)
+    # enable logging
+    logging.basicConfig(filename=args.log_file,
+                        format='%(asctime)s %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S %p',
+                        level=logging.DEBUG)
+
+    check_for_duplicates(args.directory, args.move_to_directory[0])
 else:
     sys.exit(2)
