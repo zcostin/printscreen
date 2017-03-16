@@ -3,9 +3,10 @@
 import sys
 import os
 import argparse
+import logging
 import zipfile
 
-version = '0.1'
+version = '0.2'
 
 def uprint(*objects, sep=' ', end='\n', file=sys.stdout):
     enc = file.encoding
@@ -32,13 +33,17 @@ def rename_file(source, destination, confirmation = True):
     if os.path.exists(source):
         try:
             os.rename(source, destination)
-            uprint(" Renamed {} to {}\n".format(source, destination))
-        except:
-            print("Cannot rename file {}".format(source))
+        except OSError as e:
+            err_msg = "Cannot rename file {} to {} ({})".format(source, destination, e.strerror)
+            print(err_msg)
+            logging.info(err_msg)
+        else:
+            msg = "Renamed {} to {}".format(source, destination)
+            uprint(msg)
+            logging.info(msg)
 
 
 def rename_zip(paths, file_desc=sys.stdout):
-    extension_list=["doc", "pdf", "jpg"]
 
     for path in paths:
         for dirpath, dirnames, filenames in os.walk(path):
@@ -47,6 +52,7 @@ def rename_zip(paths, file_desc=sys.stdout):
 
                 if zipfile.is_zipfile(full_path):
                     file_list = zipfile.ZipFile(full_path, 'r').namelist()
+                    file_list = [ os.path.basename(f) for f in file_list ]
 
                     file_list_modified = [ dirpath + "/" + os.path.splitext(f)[0] + ".zip" for f in file_list ]
 
@@ -72,13 +78,14 @@ def rename_zip(paths, file_desc=sys.stdout):
 if __name__== "__main__":
     parser = argparse.ArgumentParser(
                  formatter_class=argparse.RawDescriptionHelpFormatter,
-                 description='Rename archives.',
+                 description='Rename archives (only .zip files supported so far).',
                  epilog="Version: {}".format(version))
 
     parser.add_argument('-d','--directory', type=str, nargs=1,
-                        help='directory to scan for duplicate files')
+                        help='directory to scan for archived files')
 
-    parser.add_argument('-l', '--log_file', type=str, help='log file')
+    parser.add_argument('-l', '--log_file', type=str, nargs='?',
+                        default='rename_archs.log', help='log file')
 
     if len(sys.argv) < 2:
         parser.print_help()
@@ -86,7 +93,12 @@ if __name__== "__main__":
 
     args = parser.parse_args()
 
-    #with open(args.log_file, 'w+') as f1:
+    # enable logging
+    logging.basicConfig(filename=args.log_file,
+                        format='%(asctime)s %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S %p',
+                        level=logging.DEBUG)
+
     rename_zip(args.directory)
 else:
     sys.exit(2)
